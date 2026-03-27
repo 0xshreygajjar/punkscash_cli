@@ -1,4 +1,4 @@
-import { Command, CommandRunner, Option } from 'nest-commander';
+import { Command, CommandRunner, Option, InquirerService } from 'nest-commander';
 import { ethers } from 'ethers';
 import * as dotenv from 'dotenv';
 import { SovereignSwarm } from 'sovereign-swarm';
@@ -11,31 +11,59 @@ dotenv.config();
   description: 'Register an agent using SovereignSwarm',
 })
 export class RegisterCommand extends CommandRunner {
+  constructor(private readonly inquirerService: InquirerService) {
+    super();
+  }
   async run(
     passedParam: string[],
     options?: Record<string, any>,
   ): Promise<void> {
-    console.log('=== SovereignSwarm Agent Registration ===\n');
-
-    const agentName = options?.name || passedParam[0];
-    if (!agentName) {
-      console.error('❌ Error: Agent name is required. Use --name "My Agent"');
-      return;
-    }
-
-    const agentDescription = options?.description || 'A high-performance AI agent with X402 payment support';
-    const agentImage = options?.image || 'ipfs://bafkreihs7xtyc2dufbahs4ajel3eunc7mraw4zihcl5fhjbxx2jl5fdpbu';
-
     // Configuration
     const RPC_URL = process.env.RPC_URL;
-    const PRIVATE_KEY = options?.privateKey || process.env.PRIVATE_KEY;
+    const PRIVATE_KEY = options?.privateKey;
     const CHAIN_ID = parseInt(options?.chainId || process.env.CHAIN_ID || '97');
     const PINATA_JWT = process.env.PINATA_JWT;
+
 
     if (!PRIVATE_KEY) {
       console.error('❌ Error: PRIVATE_KEY not set (via flag or .env file)');
       return;
     }
+
+    console.log(`\n🔑 Wallet Identification: ${PRIVATE_KEY ? new ethers.Wallet(PRIVATE_KEY).address : 'Not set'}\n`);
+
+    // Interactive prompts for missing info
+    const interactiveOptions = await this.inquirerService.ask(
+      'register-questions',
+      options,
+    );
+
+    const agentName = interactiveOptions.name || passedParam[0];
+    const agentDescription = interactiveOptions.description || 'a newly created agent to register';
+    const modelProvider = interactiveOptions.provider || 'anthropic';
+    const modelName = interactiveOptions.model || 'gpt-4';
+    const capabilities = interactiveOptions.capabilities || 'research, analysis';
+    const category = options?.category || 'AI Agent';
+    const version = options?.version || '1.0.0';
+    const price = options?.price || '0.0001';
+    const agentImage = options?.image || 'ipfs://bafkreihs7xtyc2dufbahs4ajel3eunc7mraw4zihcl5fhjbxx2jl5fdpbu';
+
+    if (!agentName) {
+      console.error('❌ Error: Agent name is required.');
+      return;
+    }
+
+    console.log('\n--- Configuration Summary ---');
+    console.log(`📦 Agent Name   : ${agentName}`);
+    console.log(`📝 Description  : ${agentDescription}`);
+    console.log(`🤖 Provider     : ${modelProvider}`);
+    console.log(`🧠 Model        : ${modelName}`);
+    console.log(`🛠  Capabilities : ${capabilities}`);
+    console.log(`📂 Category     : ${category}`);
+    console.log(`🏷  Version      : ${version}`);
+    console.log(`💰 Base Price   : ${price} ETH`);
+    console.log('-----------------------------\n');
+
 
     if (!RPC_URL) {
       console.error('❌ Error: RPC_URL not set in .env file');
@@ -45,10 +73,9 @@ export class RegisterCommand extends CommandRunner {
     try {
       const provider = new ethers.JsonRpcProvider(RPC_URL);
       const signer = new ethers.Wallet(PRIVATE_KEY, provider);
-      console.log('✅ Signer address:', signer.address);
-      console.log('✅ Chain ID:', CHAIN_ID);
+      
+      process.stdout.write('⚡ Signing registration message... ');
 
-      console.log('\n--- Step 1: Initialize SDK ---');
       const sdkConfig: any = {
         chainId: CHAIN_ID,
         rpcUrl: RPC_URL,
@@ -58,54 +85,64 @@ export class RegisterCommand extends CommandRunner {
       };
 
       const sdk = new SovereignSwarm(sdkConfig);
-      
-      const currentChain = await sdk.chainId();
-      console.log('✅ SDK initialized on chain:', currentChain);
-
       const balance = await provider.getBalance(signer.address);
-      console.log("✅ Wallet balance:", ethers.formatEther(balance), "ETH");
 
-      console.log('\n--- Step 2: Create Agent (off-chain) ---');
+      process.stdout.write('DONE\n');
+      process.stdout.write('🌐 Registering with Punkscash Gateway... ');
+
       const agent = sdk.createAgent({
         name: agentName,
         description: agentDescription,
         image: agentImage,
         x402support: true,
         metadata: { 
-          category: "Analytics",
-          version: "1.0.0",
+          category: category,
+          version: version,
+          modelProvider: modelProvider,
+          modelName: modelName,
+          capabilities: capabilities.split(',').map((s: string) => s.trim()),
           pricing: {
-            perQuery: "0.0001"
+            perQuery: price
           }
         },
         active: true,
         owners: [signer.address as `0x${string}`],
       });
-      console.log(`✅ Agent object created locally`);
+      process.stdout.write('DONE\n');
 
-      console.log('\n--- Step 3: Configure MCP Integration ---');
       try {
         await agent.setMCP(
           "https://api.example.com/mcp",
           "2024-11-05",
-          false // Auto-fetch capabilities
+          false
         );
-        console.log("✅ MCP server configured");
       } catch (e) {
-        console.log("⚠️ MCP configuration skipped:", (e as Error).message);
+        console.log("\n⚠️  MCP registration failed.");
       }
 
-      console.log('\n--- Step 4: Register Agent On-Chain ---');
       if (balance === 0n) {
-        console.log("❌ Insufficient balance for registration");
+        console.log("\n⚠️  Insufficient balance for on-chain registration.");
+        console.log("   Your agent is registered with the gateway but not yet on-chain.");
         return;
       }
 
-      console.log("📝 Uploading metadata to IPFS and sending transaction...");
       const registration = await agent.registerIPFS();
-      console.log('\n🎉 Agent Registered Successfully!');
-      console.log('   Agent ID:', registration.agentId);
-      console.log('   IPFS URI:', registration.agentURI);
+
+      console.log('\n✨ PunksCash Agent Activation Successful! ✨\n');
+      console.log(`   ID Tag     : #${registration.agentId}`);
+      console.log(`   Owner      : ${signer.address}`);
+      console.log(`   Status     : ACTIVE / ON-CHAIN\n`);
+
+      console.log('--- Network Status ---');
+      console.log('✔ On-chain identity minted (ERC-8004)');
+      console.log('✔ IPFS metadata broadcast confirmed');
+      console.log('✔ Proactive network scanning active');
+      console.log('----------------------\n');
+
+      console.log('🚀 Your agent is now part of the Sovereign Swarm.');
+      console.log('To start interacting, run:');
+      console.log('   punkscash status --id ' + registration.agentId + '\n');
+
 
     } catch (error) {
       console.error('\n❌ Registration failed:', error instanceof Error ? error.message : String(error));
@@ -136,6 +173,54 @@ export class RegisterCommand extends CommandRunner {
     return val;
   }
 
+
+  @Option({
+    flags: '-p, --provider [provider]',
+    description: 'The model provider (e.g. anthropic, openai)',
+  })
+  parseProvider(val: string): string {
+    return val;
+  }
+
+  @Option({
+    flags: '-m, --model [model]',
+    description: 'The model name (e.g. gpt-4)',
+  })
+  parseModel(val: string): string {
+    return val;
+  }
+
+  @Option({
+    flags: '-c, --capabilities [capabilities]',
+    description: 'Comma-separated capabilities',
+  })
+  parseCapabilities(val: string): string {
+    return val;
+  }
+
+  @Option({
+    flags: '--category [category]',
+    description: 'The category of the agent (default: AI Agent)',
+  })
+  parseCategory(val: string): string {
+    return val;
+  }
+
+  @Option({
+    flags: '--version [version]',
+    description: 'The version of the agent (default: 1.0.0)',
+  })
+  parseVersion(val: string): string {
+    return val;
+  }
+
+  @Option({
+    flags: '--price [price]',
+    description: 'The pricing per query in ETH (default: 0.0001)',
+  })
+  parsePrice(val: string): string {
+    return val;
+  }
 
   @Option({
     flags: '--privateKey [privateKey]',

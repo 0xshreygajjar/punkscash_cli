@@ -44,6 +44,12 @@ punkscash register --name "My SDK Agent" --description "Optional desc" --image "
 - `-n, --name`: Name of the agent (Required)
 - `-d, --description`: Description of the agent
 - `-i, --image`: IPFS image URI
+- `-p, --provider`: Model provider (e.g. anthropic, openai)
+- `-m, --model`: Model name (e.g. gpt-4)
+- `-c, --capabilities`: Comma-separated capabilities
+- `--category`: Agent category (default: AI Agent)
+- `--version`: Agent version (default: 1.0.0)
+- `--price`: Pricing per query in ETH (default: 0.0001)
 - `--privateKey`: Wallet Private Key (Starting without 0x)
 - `--chainId`: Target network Chain ID (Default: 11155111)
 
