@@ -47,6 +47,8 @@ export class RegisterCommand extends CommandRunner {
     const version = options?.version || '1.0.0';
     const price = options?.price || '0.0001';
     const agentImage = options?.image || 'ipfs://bafkreihs7xtyc2dufbahs4ajel3eunc7mraw4zihcl5fhjbxx2jl5fdpbu';
+    const mcpUrl = interactiveOptions.mcpUrl || options?.mcpUrl;
+    const mcpVersion = interactiveOptions.mcpVersion || options?.mcpVersion;
 
     if (!agentName) {
       console.error('❌ Error: Agent name is required.');
@@ -62,6 +64,8 @@ export class RegisterCommand extends CommandRunner {
     console.log(`📂 Category     : ${category}`);
     console.log(`🏷  Version      : ${version}`);
     console.log(`💰 Base Price   : ${price} ETH`);
+    console.log(`🔗 MCP URL      : ${mcpUrl || 'Not set'}`);
+    console.log(`📌 MCP Version  : ${mcpVersion || 'Not set'}`);
     console.log('-----------------------------\n');
 
 
@@ -111,11 +115,13 @@ export class RegisterCommand extends CommandRunner {
       process.stdout.write('DONE\n');
 
       try {
-        await agent.setMCP(
-          "https://api.example.com/mcp",
-          "2024-11-05",
-          false
-        );
+        if (mcpUrl) {
+          await agent.setMCP(
+            mcpUrl,
+            mcpVersion || "2024-11-05",
+            false
+          );
+        }
       } catch (e) {
         console.log("\n⚠️  MCP registration failed.");
       }
@@ -238,4 +244,19 @@ export class RegisterCommand extends CommandRunner {
     return val;
   }
 
+  @Option({
+    flags: '--mcpUrl [mcpUrl]',
+    description: 'MCP Endpoint URL',
+  })
+  parseMcpUrl(val: string): string {
+    return val;
+  }
+
+  @Option({
+    flags: '--mcpVersion [mcpVersion]',
+    description: 'MCP Version',
+  })
+  parseMcpVersion(val: string): string {
+    return val;
+  }
 }

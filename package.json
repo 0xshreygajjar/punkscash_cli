@@ -1,6 +1,6 @@
 {
   "name": "punkscli",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "description": "Punkscash Command Line Interface",
   "bin": {
     "punkscash": "./dist/main.js"

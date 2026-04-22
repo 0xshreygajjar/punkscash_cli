@@ -45,4 +45,22 @@ export class RegisterQuestions {
   parseCapabilities(val: string) {
     return val;
   }
+
+  @Question({
+    name: 'mcpUrl',
+    message: 'MCP Endpoint URL (optional):',
+    default: 'https://api.example.com/mcp',
+  })
+  parseMcpUrl(val: string) {
+    return val;
+  }
+
+  @Question({
+    name: 'mcpVersion',
+    message: 'MCP Version (optional):',
+    default: '2024-11-05',
+  })
+  parseMcpVersion(val: string) {
+    return val;
+  }
 }
